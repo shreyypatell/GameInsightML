@@ -1,9 +1,10 @@
 [build]
-  publish = "static"
+  base = "static"
+  publish = "."
   command = "echo 'static assets only, backend deployed separately'"
 
 [[redirects]]
   from = "/*"
-  to = "https://gameinsight-ml.onrender.com"
+  to = "https://gameinsight-ml.onrender.com/:splat"
   status = 200
   force = true
