@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Dataset Overview{% endblock %}
+{% block content %}
+<h1>Dataset Overview</h1>
+<p style="color:var(--text-soft); max-width:640px;">Every column, data type, and null count in the source file, plus a quick look at the raw rows before any cleaning touches them.</p>
+
+<div class="grid grid-4" style="margin-top:24px;">
+  <div class="card"><div class="result-metric"><div class="value">{{ overview.shape[0] }}</div><div class="label">Rows</div></div></div>
+  <div class="card"><div class="result-metric"><div class="value">{{ overview.shape[1] }}</div><div class="label">Columns</div></div></div>
+  <div class="card"><div class="result-metric"><div class="value">{{ overview.missing.values() | sum }}</div><div class="label">Missing Values</div></div></div>
+  <div class="card"><div class="result-metric"><div class="value">{{ overview.columns | length }}</div><div class="label">Features</div></div></div>
+</div>
+
+<div class="section-title"><h2>Column Details</h2><span>Types and missing counts</span></div>
+<div class="table-scroll">
+<table>
+<thead><tr><th>Column</th><th>Data Type</th><th>Missing Values</th></tr></thead>
+<tbody>
+{% for col in overview.columns %}
+<tr><td>{{ col }}</td><td class="mono">{{ overview.dtypes[col] }}</td><td>{{ overview.missing[col] }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="section-title"><h2>Sample Rows</h2><span>First 15 records</span></div>
+<div class="table-scroll">
+<table>
+<thead><tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for row in sample_rows %}
+<tr>{% for col in columns %}<td>{{ row[col] }}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div style="margin-top:30px;">
+  <a href="/download/dataset" class="btn btn-olive">Download Raw Dataset</a>
+</div>
+{% endblock %}

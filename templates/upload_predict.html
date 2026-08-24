@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Upload CSV Prediction{% endblock %}
+{% block content %}
+<h1>Upload CSV Prediction</h1>
+<p style="color:var(--text-soft); max-width:640px;">Bring your own list of games and get sales predictions for the whole batch at once. Column names don't have to match exactly — Console, System, or Release_Year all work just as well as Platform or Year, and anything missing gets a reasonable default.</p>
+
+<div class="card" style="margin-top:24px;">
+  <div class="form-field" style="max-width:260px; margin-bottom:18px;">
+    <label for="uploadModelChoice">Prediction Model</label>
+    <select id="uploadModelChoice">
+      <option value="linear_regression">Linear Regression</option>
+      <option value="random_forest" selected>Random Forest</option>
+      <option value="xgboost">XGBoost</option>
+    </select>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <p id="dropzoneText">Drag and drop a CSV file here, or click to browse</p>
+    <input type="file" id="fileInput" accept=".csv" style="display:none;">
+  </div>
+
+  <div class="progress-bar" id="progressBar" style="display:none;">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+
+  <div style="margin-top:18px;">
+    <button class="btn btn-terracotta" id="uploadBtn" disabled>Run Predictions</button>
+  </div>
+</div>
+
+<div id="resultsSection" style="display:none; margin-top:34px;">
+  <div class="section-title"><h2>Prediction Results</h2><span id="rowCount"></span></div>
+  <div class="search-bar">
+    <input type="text" id="tableSearch" placeholder="Search results...">
+  </div>
+  <p style="color:var(--text-soft); font-size:13px; margin-top:-6px;" id="previewNote"></p>
+  <div class="table-scroll">
+    <table id="resultsTable">
+      <thead id="resultsHead"></thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+  <div class="pagination" id="pagination"></div>
+  <div style="margin-top:20px;">
+    <a href="#" class="btn btn-olive" id="downloadLink">Download Predictions CSV</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const uploadBtn = document.getElementById('uploadBtn');
+let selectedFile = null;
+let allRows = [];
+let totalRowsCount = 0;
+let currentPage = 1;
+const rowsPerPage = 10;
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    showToast('Please upload a CSV file', 'error');
+    return;
+  }
+  selectedFile = file;
+  document.getElementById('dropzoneText').textContent = 'Selected: ' + file.name;
+  uploadBtn.disabled = false;
+}
+
+uploadBtn.addEventListener('click', function () {
+  if (!selectedFile) return;
+
+  const progressBar = document.getElementById('progressBar');
+  const progressFill = document.getElementById('progressFill');
+  progressBar.style.display = 'block';
+  progressFill.style.width = '30%';
+  uploadBtn.disabled = true;
+  uploadBtn.innerHTML = '<span class="spinner"></span> Processing...';
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+  formData.append('model', document.getElementById('uploadModelChoice').value);
+
+  fetch('/api/upload-predict', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+      progressFill.style.width = '100%';
+      if (data.error) {
+        showToast(data.error, 'error');
+        return;
+      }
+      allRows = data.rows;
+      totalRowsCount = data.total_rows;
+      const noteEl = document.getElementById('previewNote');
+      let noteParts = [];
+      if (data.total_rows > data.previewed_rows) {
+        noteParts.push('Table and search below show the first ' + data.previewed_rows + ' rows only. The downloaded CSV contains all ' + data.total_rows + ' predicted rows.');
+      }
+      const mappedCols = Object.keys(data.column_mapping || {});
+      if (mappedCols.length) {
+        const mappedText = mappedCols.map(k => data.column_mapping[k] + ' -> ' + k).join(', ');
+        noteParts.push('Matched columns: ' + mappedText + '.');
+      }
+      if (data.defaulted_columns && data.defaulted_columns.length) {
+        noteParts.push('Could not find ' + data.defaulted_columns.join(', ') + ' in your file, used default values instead.');
+      }
+      noteEl.textContent = noteParts.join(' ');
+      renderTable();
+      document.getElementById('resultsSection').style.display = 'block';
+      document.getElementById('downloadLink').href = data.download_url;
+      if (data.total_rows > data.previewed_rows) {
+        showToast('Predicted ' + data.total_rows + ' rows. Showing first ' + data.previewed_rows + ' below, full results are in the download.');
+      } else {
+        showToast('Predictions generated for ' + data.total_rows + ' rows');
+      }
+    })
+    .catch(() => showToast('Upload failed. Please try again.', 'error'))
+    .finally(() => {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Run Predictions';
+      setTimeout(() => { progressBar.style.display = 'none'; progressFill.style.width = '0%'; }, 800);
+    });
+});
+
+function renderTable(filtered) {
+  const rows = filtered || allRows;
+  const head = document.getElementById('resultsHead');
+  const body = document.getElementById('resultsBody');
+  const labelCount = totalRowsCount || rows.length;
+  document.getElementById('rowCount').textContent = labelCount + ' rows' + (totalRowsCount > rows.length ? ' (showing preview of ' + rows.length + ')' : '');
+
+  if (rows.length === 0) {
+    head.innerHTML = '';
+    body.innerHTML = '<tr><td>No results</td></tr>';
+    return;
+  }
+
+  const columns = Object.keys(rows[0]);
+  head.innerHTML = '<tr>' + columns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+
+  const start = (currentPage - 1) * rowsPerPage;
+  const pageRows = rows.slice(start, start + rowsPerPage);
+  body.innerHTML = pageRows.map(row => '<tr>' + columns.map(c => `<td>${row[c]}</td>`).join('') + '</tr>').join('');
+
+  renderPagination(rows.length);
+}
+
+function renderPagination(totalRows) {
+  const pagesCount = Math.ceil(totalRows / rowsPerPage);
+  const pagContainer = document.getElementById('pagination');
+  pagContainer.innerHTML = '';
+  for (let i = 1; i <= pagesCount; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    if (i === currentPage) btn.classList.add('active');
+    btn.addEventListener('click', () => { currentPage = i; renderTable(); });
+    pagContainer.appendChild(btn);
+  }
+}
+
+document.getElementById('tableSearch').addEventListener('input', function (e) {
+  const query = e.target.value.toLowerCase();
+  currentPage = 1;
+  const filtered = allRows.filter(row => Object.values(row).some(v => String(v).toLowerCase().includes(query)));
+  renderTable(filtered);
+});
+</script>
+{% endblock %}

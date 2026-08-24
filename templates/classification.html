@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Classification Results{% endblock %}
+{% block content %}
+<h1>Classification Models</h1>
+<p style="color:var(--text-soft); max-width:640px;">Every title gets sorted into a Low, Medium, or High sales bracket based on where its Global_Sales falls, then two classifiers compete to call it correctly.</p>
+
+<div class="section-title"><h2>Comparison Table</h2><span>Weighted average across classes</span></div>
+<div class="table-scroll">
+<table>
+<thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1 Score</th></tr></thead>
+<tbody id="clfTableBody"></tbody>
+</table>
+</div>
+
+<div class="tabs" style="margin-top:40px;" id="clfTabs"></div>
+<div id="clfPanels"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const results = {{ results | tojson }};
+const modelNames = { random_forest: 'Random Forest', xgboost: 'XGBoost' };
+
+const tableBody = document.getElementById('clfTableBody');
+Object.keys(results).forEach(key => {
+  const r = results[key];
+  const row = document.createElement('tr');
+  row.innerHTML = `<td>${modelNames[key]}</td><td class="mono">${(r.accuracy*100).toFixed(2)}%</td><td class="mono">${(r.precision*100).toFixed(2)}%</td><td class="mono">${(r.recall*100).toFixed(2)}%</td><td class="mono">${(r.f1*100).toFixed(2)}%</td>`;
+  tableBody.appendChild(row);
+});
+
+const tabsContainer = document.getElementById('clfTabs');
+const panelsContainer = document.getElementById('clfPanels');
+
+Object.keys(results).forEach((key, i) => {
+  const tabBtn = document.createElement('button');
+  tabBtn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+  tabBtn.textContent = modelNames[key];
+  tabBtn.dataset.key = key;
+  tabsContainer.appendChild(tabBtn);
+
+  const panel = document.createElement('div');
+  panel.className = 'tab-panel' + (i === 0 ? ' active' : '');
+  panel.id = 'panel-' + key;
+  panel.innerHTML = `
+    <div class="grid grid-2">
+      <div class="card chart-box" id="cm-${key}"></div>
+      <div class="card chart-box" id="roc-${key}"></div>
+    </div>
+    <div class="section-title"><h2>Classification Report</h2><span>${modelNames[key]}</span></div>
+    <div class="table-scroll"><table><thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Support</th></tr></thead><tbody id="report-${key}"></tbody></table></div>
+  `;
+  panelsContainer.appendChild(panel);
+});
+
+function renderClfCharts(key) {
+  const r = results[key];
+
+  Plotly.newPlot('cm-' + key, [{
+    z: r.confusion_matrix, x: r.labels, y: r.labels, type: 'heatmap',
+    colorscale: [[0, '#F4E9D8'], [0.5, '#D97B66'], [1, '#23395B']]
+  }], {
+    title: 'Confusion Matrix', paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+  }, { responsive: true, displayModeBar: false });
+
+  const rocTraces = Object.keys(r.roc).map(cls => ({
+    x: r.roc[cls].fpr, y: r.roc[cls].tpr, mode: 'lines', name: cls + ' (AUC ' + r.roc[cls].auc.toFixed(3) + ')'
+  }));
+  rocTraces.push({ x: [0, 1], y: [0, 1], mode: 'lines', line: { dash: 'dash', color: '#999' }, name: 'Random' });
+
+  Plotly.newPlot('roc-' + key, rocTraces, {
+    title: 'ROC Curve', xaxis: { title: 'False Positive Rate' }, yaxis: { title: 'True Positive Rate' },
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+  }, { responsive: true, displayModeBar: false });
+
+  const reportBody = document.getElementById('report-' + key);
+  reportBody.innerHTML = '';
+  Object.keys(r.classification_report).forEach(cls => {
+    if (['accuracy', 'macro avg', 'weighted avg'].includes(cls)) return;
+    const row = r.classification_report[cls];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${cls}</td><td class="mono">${row.precision.toFixed(3)}</td><td class="mono">${row.recall.toFixed(3)}</td><td class="mono">${row['f1-score'].toFixed(3)}</td><td class="mono">${row.support}</td>`;
+    reportBody.appendChild(tr);
+  });
+}
+
+renderClfCharts(Object.keys(results)[0]);
+
+tabsContainer.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabsContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    panelsContainer.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.key).classList.add('active');
+    renderClfCharts(btn.dataset.key);
+  });
+});
+</script>
+{% endblock %}

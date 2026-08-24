@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Model Comparison{% endblock %}
+{% block content %}
+<h1>Model Comparison</h1>
+<p style="color:var(--text-soft); max-width:640px;">Every regressor and classifier lined up against each other, so it's easy to see which one actually pulls its weight.</p>
+
+<div class="section-title"><h2>Regression Comparison</h2><span>MAE, RMSE and R2</span></div>
+<div class="card chart-box" id="regChart"></div>
+
+<div class="section-title"><h2>Classification Comparison</h2><span>Accuracy, Precision, Recall, F1</span></div>
+<div class="card chart-box" id="clfChart"></div>
+
+<div class="section-title"><h2>Confusion Matrices</h2><span>Random Forest vs XGBoost</span></div>
+<div class="grid grid-2">
+  <div class="card chart-box" id="cmRF"></div>
+  <div class="card chart-box" id="cmXGB"></div>
+</div>
+
+<div class="section-title"><h2>ROC Curves</h2><span>Random Forest vs XGBoost</span></div>
+<div class="grid grid-2">
+  <div class="card chart-box" id="rocRF"></div>
+  <div class="card chart-box" id="rocXGB"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const regResults = {{ reg_results | tojson }};
+const clfResults = {{ clf_results | tojson }};
+const regNames = { linear_regression: 'Linear Regression', random_forest: 'Random Forest', xgboost: 'XGBoost' };
+const clfNames = { random_forest: 'Random Forest', xgboost: 'XGBoost' };
+
+const regKeys = Object.keys(regResults);
+Plotly.newPlot('regChart', [
+  { x: regKeys.map(k => regNames[k]), y: regKeys.map(k => regResults[k].mae), name: 'MAE', type: 'bar', marker: { color: '#23395B' } },
+  { x: regKeys.map(k => regNames[k]), y: regKeys.map(k => regResults[k].rmse), name: 'RMSE', type: 'bar', marker: { color: '#D97B66' } },
+  { x: regKeys.map(k => regNames[k]), y: regKeys.map(k => regResults[k].r2), name: 'R2', type: 'bar', marker: { color: '#6C8A5A' } }
+], { barmode: 'group', paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)' }, { responsive: true, displayModeBar: false });
+
+const clfKeys = Object.keys(clfResults);
+Plotly.newPlot('clfChart', [
+  { x: clfKeys.map(k => clfNames[k]), y: clfKeys.map(k => clfResults[k].accuracy), name: 'Accuracy', type: 'bar', marker: { color: '#23395B' } },
+  { x: clfKeys.map(k => clfNames[k]), y: clfKeys.map(k => clfResults[k].precision), name: 'Precision', type: 'bar', marker: { color: '#D97B66' } },
+  { x: clfKeys.map(k => clfNames[k]), y: clfKeys.map(k => clfResults[k].recall), name: 'Recall', type: 'bar', marker: { color: '#6C8A5A' } },
+  { x: clfKeys.map(k => clfNames[k]), y: clfKeys.map(k => clfResults[k].f1), name: 'F1', type: 'bar', marker: { color: '#444444' } }
+], { barmode: 'group', paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)' }, { responsive: true, displayModeBar: false });
+
+function renderCM(elId, key) {
+  const r = clfResults[key];
+  Plotly.newPlot(elId, [{
+    z: r.confusion_matrix, x: r.labels, y: r.labels, type: 'heatmap',
+    colorscale: [[0, '#F4E9D8'], [0.5, '#D97B66'], [1, '#23395B']]
+  }], { title: clfNames[key], paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)' }, { responsive: true, displayModeBar: false });
+}
+renderCM('cmRF', 'random_forest');
+renderCM('cmXGB', 'xgboost');
+
+function renderROC(elId, key) {
+  const r = clfResults[key];
+  const traces = Object.keys(r.roc).map(cls => ({
+    x: r.roc[cls].fpr, y: r.roc[cls].tpr, mode: 'lines', name: cls + ' (AUC ' + r.roc[cls].auc.toFixed(3) + ')'
+  }));
+  traces.push({ x: [0, 1], y: [0, 1], mode: 'lines', line: { dash: 'dash', color: '#999' }, name: 'Random' });
+  Plotly.newPlot(elId, traces, { title: clfNames[key], paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)' }, { responsive: true, displayModeBar: false });
+}
+renderROC('rocRF', 'random_forest');
+renderROC('rocXGB', 'xgboost');
+</script>
+{% endblock %}

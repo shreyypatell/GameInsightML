@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+models/*.pkl
+models/*.json
+uploads/*.csv
+predictions/*.csv
+.DS_Store
+*.log
+.vscode/
+.idea/

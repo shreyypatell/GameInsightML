@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Regression Results{% endblock %}
+{% block content %}
+<h1>Regression Models</h1>
+<p style="color:var(--text-soft); max-width:640px;">Predicting how many copies a title sells worldwide, using nothing but its platform, genre, publisher, and release year across three different regressors.</p>
+
+<div class="section-title"><h2>Comparison Table</h2><span>Lower MAE / RMSE and higher R2 is better</span></div>
+<div class="table-scroll">
+<table>
+<thead><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>R2 Score</th></tr></thead>
+<tbody id="regTableBody"></tbody>
+</table>
+</div>
+
+<div class="section-title"><h2>Model Ranking</h2><span>Ranked by R2 score</span></div>
+<ol class="rank-list" id="rankList"></ol>
+
+<div class="tabs" style="margin-top:40px;" id="modelTabs"></div>
+
+<div id="modelPanels"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const results = {{ results | tojson }};
+const modelNames = {
+  linear_regression: 'Linear Regression',
+  random_forest: 'Random Forest',
+  xgboost: 'XGBoost'
+};
+
+const tableBody = document.getElementById('regTableBody');
+Object.keys(results).forEach(key => {
+  const r = results[key];
+  const row = document.createElement('tr');
+  row.innerHTML = `<td>${modelNames[key]}</td><td class="mono">${r.mae.toFixed(4)}</td><td class="mono">${r.rmse.toFixed(4)}</td><td class="mono">${r.r2.toFixed(4)}</td>`;
+  tableBody.appendChild(row);
+});
+
+const ranked = Object.keys(results).sort((a, b) => results[b].r2 - results[a].r2);
+const rankList = document.getElementById('rankList');
+ranked.forEach((key, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<span><span class="rank-num">#${i + 1}</span>${modelNames[key]}</span><span class="mono">R2 = ${results[key].r2.toFixed(4)}</span>`;
+  rankList.appendChild(li);
+});
+
+const tabsContainer = document.getElementById('modelTabs');
+const panelsContainer = document.getElementById('modelPanels');
+
+Object.keys(results).forEach((key, i) => {
+  const tabBtn = document.createElement('button');
+  tabBtn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+  tabBtn.textContent = modelNames[key];
+  tabBtn.dataset.key = key;
+  tabsContainer.appendChild(tabBtn);
+
+  const panel = document.createElement('div');
+  panel.className = 'tab-panel' + (i === 0 ? ' active' : '');
+  panel.id = 'panel-' + key;
+  panel.innerHTML = `
+    <div class="grid grid-2">
+      <div class="card chart-box" id="scatter-${key}"></div>
+      <div class="card chart-box" id="residual-${key}"></div>
+    </div>
+    <div class="card chart-box" style="margin-top:22px;" id="importance-${key}"></div>
+  `;
+  panelsContainer.appendChild(panel);
+});
+
+function renderModelCharts(key) {
+  const r = results[key];
+  const actual = r.actual;
+  const predicted = r.predictions;
+  const residuals = actual.map((a, i) => a - predicted[i]);
+
+  Plotly.newPlot('scatter-' + key, [{
+    x: actual, y: predicted, mode: 'markers', type: 'scatter',
+    marker: { color: '#D97B66', opacity: 0.6 }
+  }, {
+    x: [Math.min(...actual), Math.max(...actual)],
+    y: [Math.min(...actual), Math.max(...actual)],
+    mode: 'lines', line: { color: '#23395B', dash: 'dash' }
+  }], {
+    title: 'Predicted vs Actual', xaxis: { title: 'Actual' }, yaxis: { title: 'Predicted' },
+    showlegend: false, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+  }, { responsive: true, displayModeBar: false });
+
+  Plotly.newPlot('residual-' + key, [{
+    x: predicted, y: residuals, mode: 'markers', type: 'scatter',
+    marker: { color: '#6C8A5A', opacity: 0.6 }
+  }], {
+    title: 'Residual Plot', xaxis: { title: 'Predicted' }, yaxis: { title: 'Residual' },
+    showlegend: false, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+  }, { responsive: true, displayModeBar: false });
+
+  const importance = r.feature_importance;
+  const entries = Object.entries(importance).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  Plotly.newPlot('importance-' + key, [{
+    x: entries.map(e => e[1]), y: entries.map(e => e[0]), type: 'bar', orientation: 'h',
+    marker: { color: '#23395B' }
+  }], {
+    title: 'Feature Importance', margin: { l: 160 },
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    yaxis: { categoryorder: 'total ascending' }
+  }, { responsive: true, displayModeBar: false });
+}
+
+renderModelCharts(Object.keys(results)[0]);
+
+tabsContainer.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabsContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    panelsContainer.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.key).classList.add('active');
+    renderModelCharts(btn.dataset.key);
+  });
+});
+</script>
+{% endblock %}

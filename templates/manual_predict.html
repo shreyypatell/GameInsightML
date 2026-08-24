@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Manual Prediction{% endblock %}
+{% block content %}
+<h1>Manual Prediction</h1>
+<p style="color:var(--text-soft); max-width:640px;">Fill in a game's details below and see what the models think it would sell, in millions of units and as a sales tier.</p>
+
+<div class="card" style="margin-top:24px; max-width:760px;">
+  <form id="predictForm">
+    <div class="form-grid">
+      <div class="form-field">
+        <label for="platform">Platform</label>
+        <select id="platform" required>
+          {% for p in platforms %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="genre">Genre</label>
+        <select id="genre" required>
+          {% for g in genres %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="publisher">Publisher</label>
+        <select id="publisher" required>
+          {% for pub in publishers %}<option value="{{ pub }}">{{ pub }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="year">Release Year</label>
+        <input type="number" id="year" min="1980" max="2026" value="2016" required>
+      </div>
+      <div class="form-field" style="grid-column: span 2;">
+        <label for="modelChoice">Prediction Model</label>
+        <select id="modelChoice">
+          <option value="linear_regression">Linear Regression</option>
+          <option value="random_forest" selected>Random Forest</option>
+          <option value="xgboost">XGBoost</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:22px; display:flex; gap:12px;">
+      <button type="submit" class="btn btn-terracotta" id="predictBtn">Predict Sales</button>
+      <button type="reset" class="btn btn-outline" id="resetBtn">Reset</button>
+    </div>
+  </form>
+
+  <div class="result-panel" id="resultPanel">
+    <div class="result-grid">
+      <div class="result-metric">
+        <div class="value" id="resultSales">-</div>
+        <div class="label">Predicted Global Sales (millions)</div>
+      </div>
+      <div class="result-metric">
+        <div class="value" id="resultCategory">-</div>
+        <div class="label">Predicted Sales Category</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const form = document.getElementById('predictForm');
+const resultPanel = document.getElementById('resultPanel');
+const predictBtn = document.getElementById('predictBtn');
+
+form.addEventListener('submit', function (e) {
+  e.preventDefault();
+  predictBtn.disabled = true;
+  predictBtn.innerHTML = '<span class="spinner"></span> Predicting...';
+
+  const payload = {
+    platform: document.getElementById('platform').value,
+    genre: document.getElementById('genre').value,
+    publisher: document.getElementById('publisher').value,
+    year: parseInt(document.getElementById('year').value, 10),
+    model: document.getElementById('modelChoice').value
+  };
+
+  fetch('/api/manual-predict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        showToast(data.error, 'error');
+        return;
+      }
+      document.getElementById('resultSales').textContent = data.predicted_sales + 'M';
+      document.getElementById('resultCategory').textContent = data.predicted_category;
+      resultPanel.classList.add('show');
+      showToast('Prediction generated successfully');
+    })
+    .catch(() => showToast('Something went wrong while predicting', 'error'))
+    .finally(() => {
+      predictBtn.disabled = false;
+      predictBtn.textContent = 'Predict Sales';
+    });
+});
+
+document.getElementById('resetBtn').addEventListener('click', function () {
+  resultPanel.classList.remove('show');
+});
+</script>
+{% endblock %}

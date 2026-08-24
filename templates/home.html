@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}GameInsight ML — Home{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <h1>Predicting what makes a game sell.</h1>
+    <p>GameInsight ML is a machine learning system trained on tens of thousands of historical video game releases. It predicts global sales figures and classifies titles into sales tiers, using nothing but a game's platform, genre, publisher and release year.</p>
+    <div style="margin-top:26px; display:flex; gap:14px; flex-wrap:wrap;">
+      <a href="/manual-predict" class="btn btn-terracotta">Try a Prediction</a>
+      <a href="/eda" class="btn btn-outline">Explore the Data</a>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="stat-tile"><div class="value">{{ stats.total_games }}</div><div class="label">Games Analysed</div></div>
+    <div class="stat-tile"><div class="value">{{ stats.total_platforms }}</div><div class="label">Platforms</div></div>
+    <div class="stat-tile"><div class="value">{{ stats.total_publishers }}</div><div class="label">Publishers</div></div>
+    <div class="stat-tile"><div class="value">{{ stats.best_r2 }}</div><div class="label">Best R2 Score</div></div>
+  </div>
+</section>
+
+<div class="section-title">
+  <h2>What this project does</h2>
+  <span>Two ML tasks, five models, one dataset</span>
+</div>
+<div class="feature-list">
+  <div class="feature-item">
+    <h4>Regression</h4>
+    <p>Three different regressors take a crack at estimating exactly how many million copies a title will sell.</p>
+  </div>
+  <div class="feature-item">
+    <h4>Classification</h4>
+    <p>Two classifiers sort games into Low, Medium, and High sales brackets instead of guessing an exact number.</p>
+  </div>
+  <div class="feature-item">
+    <h4>Exploratory Analysis</h4>
+    <p>Dig into genre, platform, and publisher patterns across decades of releases through interactive charts.</p>
+  </div>
+  <div class="feature-item">
+    <h4>Manual Prediction</h4>
+    <p>Type in a hypothetical game's details and get a sales estimate back instantly from any of the trained models.</p>
+  </div>
+  <div class="feature-item">
+    <h4>Batch Prediction</h4>
+    <p>Drop in a CSV of upcoming titles and pull down predictions for the entire list in one go.</p>
+  </div>
+  <div class="feature-item">
+    <h4>Model Comparison</h4>
+    <p>Metrics, confusion matrices, and ROC curves for every trained model, laid out side by side.</p>
+  </div>
+</div>
+
+<div class="section-title">
+  <h2>Best performing accuracy</h2>
+  <span>Classification, weighted average</span>
+</div>
+<div class="card" style="max-width:340px;">
+  <div class="result-metric">
+    <div class="value">{{ (stats.best_accuracy * 100) | round(1) }}%</div>
+    <div class="label">Classification Accuracy</div>
+  </div>
+</div>
+{% endblock %}

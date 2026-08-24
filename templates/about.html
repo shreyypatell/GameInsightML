@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}About the Project{% endblock %}
+{% block content %}
+<h1>About This Project</h1>
+
+<div class="section-title"><h2>Downloads</h2><span>Model artifacts</span></div>
+<div class="grid grid-3">
+  <a href="/download/model/linear_regression" class="card">Linear Regression Model</a>
+  <a href="/download/model/random_forest_regressor" class="card">Random Forest Regressor</a>
+  <a href="/download/model/xgboost_regressor" class="card">XGBoost Regressor</a>
+  <a href="/download/model/random_forest_classifier" class="card">Random Forest Classifier</a>
+  <a href="/download/model/xgboost_classifier" class="card">XGBoost Classifier</a>
+  <a href="/download/dataset" class="card">Raw Dataset</a>
+</div>
+
+<div class="section-title"><h2>Retrain Models</h2><span>Runs on the current dataset/vgsales.csv</span></div>
+<div class="card" style="max-width:460px;">
+  <p style="color:var(--text-soft); margin-top:0;">Run this after swapping in a new dataset file. It rebuilds all five models from scratch and updates every metric shown across the site.</p>
+  <button class="btn btn-terracotta" id="retrainBtn">Retrain Models</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('retrainBtn').addEventListener('click', function () {
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Retraining...';
+  fetch('/api/retrain', { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+      showToast(data.message || 'Models retrained');
+    })
+    .catch(() => showToast('Retraining failed', 'error'))
+    .finally(() => {
+      btn.disabled = false;
+      btn.textContent = 'Retrain Models';
+    });
+});
+</script>
+{% endblock %}

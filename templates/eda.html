@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}EDA Dashboard{% endblock %}
+{% block content %}
+<h1>Exploratory Data Analysis</h1>
+<p style="color:var(--text-soft); max-width:640px;">Genre, platform, and publisher trends pulled straight out of the cleaned data, with sales patterns and correlations laid out visually.</p>
+
+<div id="edaLoading" style="display:flex; align-items:center; gap:12px; margin:30px 0;">
+  <span class="spinner"></span>
+</div>
+
+<div id="edaContent" style="display:none;">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="distributions">Distributions</button>
+    <button class="tab-btn" data-tab="sales">Sales</button>
+    <button class="tab-btn" data-tab="relationships">Relationships</button>
+  </div>
+
+  <div class="tab-panel active" id="tab-distributions">
+    <div class="grid grid-2">
+      <div class="card chart-box" id="chart-genre"></div>
+      <div class="card chart-box" id="chart-platform"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:22px;">
+      <div class="card chart-box" id="chart-publisher"></div>
+      <div class="card chart-box" id="chart-yearwise"></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-sales">
+    <div class="grid grid-2">
+      <div class="card chart-box" id="chart-sales_dist"></div>
+      <div class="card chart-box" id="chart-top_publishers"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:22px;">
+      <div class="card chart-box" id="chart-top_games"></div>
+      <div class="card chart-box" id="chart-histogram"></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-relationships">
+    <div class="grid grid-2">
+      <div class="card chart-box" id="chart-correlation"></div>
+      <div class="card chart-box" id="chart-boxplot"></div>
+    </div>
+    <div class="card chart-box" style="margin-top:22px;" id="chart-pairplot"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    window.dispatchEvent(new Event('resize'));
+  });
+});
+
+fetch('/api/eda-charts')
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById('edaLoading').style.display = 'none';
+    document.getElementById('edaContent').style.display = 'block';
+    Object.keys(data).forEach(key => {
+      const el = document.getElementById('chart-' + key);
+      if (el && data[key]) {
+        Plotly.newPlot(el, data[key].data, data[key].layout, {responsive: true, displayModeBar: false});
+      }
+    });
+  })
+  .catch(() => {
+    document.getElementById('edaLoading').innerHTML = '<span>Could not load charts. Please refresh.</span>';
+  });
+</script>
+{% endblock %}
